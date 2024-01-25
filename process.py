@@ -8,12 +8,13 @@ import pytesseract
 class DataLabel(str, Enum):
     ANNUAL_RAINFALL = 'ar'
     DAILY_RAINFALL = 'dr'
+    GRAPH_IMAGE = 'g_img'
     STAGE = 'stg'
     TEMPERATURE = 'temp'
     TIMESTAMP = 'ts'
     TURBIDITY = 'turb'
     WEIR_IMAGE = 'w_img'
-    GRAPH_IMAGE = 'g_img'
+    WEIR_IMAGE_TIMESTAMP = 'w_img_ts'
 
     @property
     def is_text(self):
@@ -29,6 +30,7 @@ data_label_to_coordinates = {
     DataLabel.TIMESTAMP: (530, 57 , 897, 90),
     DataLabel.TURBIDITY: (40, 270 , 140, 307),
     DataLabel.WEIR_IMAGE: (380, 124 , 985, 409),
+    DataLabel.WEIR_IMAGE_TIMESTAMP: (379, 393, 665, 409),
 }
 
 
@@ -37,6 +39,6 @@ for label, coords in data_label_to_coordinates.items():
     cropped = original.crop(box=coords)
     cropped.save(f'{label.name}.gif')
     if label.is_text:
-        print(pytesseract.image_to_string(cropped).strip())
+        print(pytesseract.image_to_string(cropped, config='-c tessedit_char_whitelist=0123456789.:/\ ').strip())
 
     
