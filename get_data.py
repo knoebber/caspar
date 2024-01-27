@@ -15,12 +15,13 @@ class JSONEncoder(json.JSONEncoder):
 def lambda_handler(event, context):
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table('caspar-creek-data')
+    date = event['queryStringParameters']['date']
 
     return {
         'statusCode': 200,
         'body': json.dumps(
             table.query(
-                KeyConditionExpression=Key('date_string').eq('2024-01-25')
+                KeyConditionExpression=Key('date_string').eq(date)
             )['Items'],
             cls=JSONEncoder,
         )
