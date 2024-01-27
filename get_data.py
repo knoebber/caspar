@@ -1,11 +1,27 @@
+import json
 import boto3
+from decimal import Decimal
 
-from boto3.dynamodb.conditions import Key, Attr
+from boto3.dynamodb.conditions import Key
+
+
+class JSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return str(obj)
+        return json.JSONEncoder.default(self, obj)
 
 
 def lambda_handler(event, context):
     dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table('caspar-creek-data')
-    return table.query(
-        KeyConditionExpression=Key('date_string').eq('2024-01-25')
-    )
+
+    return {
+        'statusCode': 200,
+        'body': json.dumps(
+            table.query(
+                KeyConditionExpression=Key('date_string').eq('2024-01-25')
+            )['Items'],
+            cls=JSONEncoder,
+        )
+    }
