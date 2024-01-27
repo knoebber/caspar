@@ -221,14 +221,16 @@ def process_obj(s3_key, s3_body, should_save_images_locally=False):
         )
         print(s3_key, 'is done')
 
+    return dynamo_item_dict
+
 
 def get_s3_obj(key):
     return s3_client.get_object(Key=key, Bucket=S3_BUCKET)
 
 
-def process_s3_key(key, should_save_locally):
+def process_s3_key(key, should_save_locally=False):
     obj = get_s3_obj(key)
-    process_obj(key, obj['Body'], should_save_locally)
+    return process_obj(key, obj['Body'], should_save_locally)
 
 
 def process_all():

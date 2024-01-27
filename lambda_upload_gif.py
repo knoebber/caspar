@@ -20,7 +20,7 @@ def lambda_handler(event, context):
         )
 
     lambda_client.invoke(
-        FunctionName='parse_caspar_creek_data',
+        FunctionName='process_caspar_creek_data',
         InvocationType='Event',
         Payload=json.dumps({'s3_key': s3_key}),
     )

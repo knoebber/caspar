@@ -1,4 +1,4 @@
-FROM public.ecr.aws/lambda/python:3.11 as build
+FROM public.ecr.aws/lambda/python:3.11-x86_64 as build
 
 WORKDIR /app
 
@@ -11,11 +11,12 @@ RUN cp /app/aws-lambda-tesseract-layer/ready-to-use/amazonlinux-2/bin/* /app/pac
     cp /app/aws-lambda-tesseract-layer/ready-to-use/amazonlinux-2/lib/* /app/package/lib/ && \
     cp -R /app/aws-lambda-tesseract-layer/ready-to-use/amazonlinux-2/tesseract /app/package/tesseract
 
-FROM public.ecr.aws/lambda/python:3.11
+FROM public.ecr.aws/lambda/python:3.11-x86_64
 
 COPY --from=build /app/package/ /opt/
 RUN pip install pytesseract boto3
 
-COPY app.py ${LAMBDA_TASK_ROOT}
+COPY process ${LAMBDA_TASK_ROOT}/process
+COPY lambda_process_data.py ${LAMBDA_TASK_ROOT}
 
-CMD ["app.handler"]
+CMD ["lambda_process_data.handler"]

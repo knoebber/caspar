@@ -15,3 +15,5 @@ push:
 	docker push $(repo):latest
 
 deploy: build tag push
+
+# todo: automatically update image in  lambda function
