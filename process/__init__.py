@@ -10,6 +10,7 @@ from pprint import pprint
 from time import time
 
 import boto3
+import botocore
 import pytesseract
 
 
@@ -83,6 +84,17 @@ def create_dynamo_table():
     )
 
 
+def does_s3_key_exist(s3_key):
+    try:
+        s3_client.head_object(Bucket=S3_BUCKET, Key=s3_key)
+    except botocore.exceptions.ClientError as e:
+        if e.response['Error']['Code'] == '404':
+            return False
+        raise e
+    else:
+        return True
+
+
 def upload_img_to_s3(s3_key, img):
     buffer = BytesIO()
     img.save(buffer, format='gif')
@@ -101,14 +113,15 @@ def add_tz_string(date_string):
 # http://fs-server.humboldt.edu/RTMC/SFCaspar_DetailView.gif
 class DataLabel(str, Enum):
     ANNUAL_RAINFALL = 0
-    DAILY_RAINFALL = 1
-    GRAPH_IMAGE = 2
-    STAGE = 3
-    TEMPERATURE = 4
-    TIMESTAMP = 5
-    TURBIDITY = 6
-    WEIR_IMAGE = 7
-    WEIR_IMAGE_TIMESTAMP = 8
+    BOTTLE_COUNT = 1
+    DAILY_RAINFALL = 2
+    GRAPH_IMAGE = 3
+    STAGE = 4
+    TEMPERATURE = 5
+    TIMESTAMP = 6
+    TURBIDITY = 7
+    WEIR_IMAGE = 8
+    WEIR_IMAGE_TIMESTAMP = 9
 
     @property
     def is_img(self):
@@ -141,6 +154,7 @@ class DataLabel(str, Enum):
         match self:
             case (
                     self.ANNUAL_RAINFALL
+                    | self.BOTTLE_COUNT
                     | self.DAILY_RAINFALL
                     | self.TEMPERATURE
                     | self.STAGE
@@ -163,6 +177,7 @@ class DataLabel(str, Enum):
 
 DATA_LABEL_TO_COORDINATES = {
     DataLabel.ANNUAL_RAINFALL: (140, 650, 270, 700),
+    DataLabel.BOTTLE_COUNT: (40, 400, 140, 450),
     DataLabel.DAILY_RAINFALL: (140, 610, 270, 650),
     DataLabel.GRAPH_IMAGE: (270, 443, 1077, 784),
     DataLabel.STAGE: (10, 190, 160, 230),
