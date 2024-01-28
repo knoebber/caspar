@@ -1,12 +1,11 @@
 import json
 
 from process import process_obj
-from process import upload_caspar_creek_gif_to_s3
+from process import get_caspar_creek_gif
 
 
 def handler(event, context):
-    s3_key, img = upload_caspar_creek_gif_to_s3()
-    item_dict = process_obj(s3_key, img)
+    item_dict = process_obj(get_caspar_creek_gif())
 
     return {
         'statusCode': 200,

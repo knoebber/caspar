@@ -49,7 +49,7 @@ def delete_dynamo_table():
 class DynamoSchema(str, Enum):
     DATE_STRING = 'date_string'
     HOUR_OF_DAY = 'hour_of_day'
-    TIMESTAMP = 'timestamp'
+    UNIX_TIMESTAMP = 'unix_timestamp'
 
 
 def create_dynamo_table():
@@ -178,20 +178,31 @@ DATA_LABEL_TO_COORDINATES = {
 TIMESTAMP_COORDS = (530, 57, 897, 90)
 
 
-def process_obj(s3_key, img, should_save_images_locally=False):
+def process_obj(img, should_save_images_locally=False):
     cropped = img.crop(box=TIMESTAMP_COORDS)
 
-    timestamp_string = get_text(cropped)
-    if should_save_images_locally:
-        cropped.save('timestamp.gif')
+    try:
+        timestamp_string = get_text(cropped)
+        if should_save_images_locally:
+            cropped.save('timestamp.gif')
 
-    if 'PM' not in timestamp_string and 'AM' not in timestamp_string:
-        timestamp_string += ' AM'
+        if 'PM' not in timestamp_string and 'AM' not in timestamp_string:
+            timestamp_string += ' AM'
 
-    timestamp = datetime.strptime(
-        add_tz_string(timestamp_string),
-        '%m/%d/%Y %I:%M:%S %p %z',
-    ).astimezone(timezone.utc)
+        timestamp = datetime.strptime(
+            add_tz_string(timestamp_string),
+            '%m/%d/%Y %I:%M:%S %p %z',
+        ).astimezone(timezone.utc)
+
+        unix_timestamp = int(timestamp.timestamp())
+    except Exception as e:
+        s3_key = f'error_{unix_now()}.gif'
+        print(f'caught {e} while parsing timestamp')
+        raise e
+    else:
+        s3_key = f'caspar_creek_{unix_timestamp}.gif'
+    finally:
+        upload_img_to_s3(s3_key, img)
 
     dynamo_item_dict = {
         's3_key': {'S': s3_key},
@@ -199,7 +210,7 @@ def process_obj(s3_key, img, should_save_images_locally=False):
             'S': datetime.strftime(timestamp, '%Y-%m-%d')
         },
         DynamoSchema.HOUR_OF_DAY: {'N': str(timestamp.hour)},
-        DynamoSchema.TIMESTAMP: {'N': str(int(timestamp.timestamp()))},
+        DynamoSchema.UNIX_TIMESTAMP: {'N': str(unix_timestamp)},
     }
 
     for label, coords in DATA_LABEL_TO_COORDINATES.items():
@@ -235,20 +246,9 @@ def process_obj(s3_key, img, should_save_images_locally=False):
     return dynamo_item_dict
 
 
-def upload_caspar_creek_gif_to_s3():
-    now = datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')
-    s3_key = now + '.gif'
-
+def get_caspar_creek_gif():
     with urllib.request.urlopen(GIF_URL) as response:
-        img = Image.open(response)
-        s3_client.put_object(
-            Body=response.read(),
-            Bucket='caspar-creek-data',
-            Key=s3_key,
-        )
-
-    upload_img_to_s3(s3_key, img)
-    return s3_key, img
+        return Image.open(response)
 
 
 def get_s3_obj(key):
@@ -257,10 +257,16 @@ def get_s3_obj(key):
 
 def process_s3_key(key, should_save_locally=False):
     obj = get_s3_obj(key)
-    return process_obj(key, Image.open(obj['Body']), should_save_locally)
+    return process_obj(Image.open(obj['Body']), should_save_locally)
 
 
 def process_all():
     for obj in s3_bucket.objects.all():
         if not obj.key.startswith(CROPS_DIR):
-            process_obj(obj.key, Image.open(obj.get()['Body']))
+            process_obj(Image.open(obj.get()['Body']))
+
+
+def delete_old_images():
+    for obj in s3_bucket.objects.all():
+        if not obj.key.startswith('caspar_creek'):
+            obj.delete()
