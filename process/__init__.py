@@ -1,4 +1,5 @@
 import decimal
+import urllib.request
 
 from PIL import Image
 from datetime import datetime
@@ -10,6 +11,14 @@ from time import time
 
 import boto3
 import pytesseract
+
+
+"""
+This program processes the image at the following URL.
+The file is downloaded, uploaded to S3, and then parsed with OCR.
+Finally, the data is stored in DynamoDB.
+"""
+GIF_URL = 'http://fs-server.humboldt.edu/RTMC/SFCaspar_DetailView.gif'
 
 S3_BUCKET = 'caspar-creek-data'
 DYNAMO_DB_TABLE = 'caspar-creek-data'
@@ -40,6 +49,7 @@ def delete_dynamo_table():
 class DynamoSchema(str, Enum):
     DATE_STRING = 'date_string'
     HOUR_OF_DAY = 'hour_of_day'
+    TIMESTAMP = 'timestamp'
 
 
 def create_dynamo_table():
@@ -73,11 +83,12 @@ def create_dynamo_table():
     )
 
 
-def upload_img_to_s3(img, key):
+def upload_img_to_s3(s3_key, img):
     buffer = BytesIO()
     img.save(buffer, format='gif')
     buffer.seek(0)
-    s3_bucket.put_object(Body=buffer, Key=key)
+    s3_bucket.put_object(Body=buffer, Key=s3_key)
+    print('uploaded', s3_key)
 
 
 CROPS_DIR = 'crops/'
@@ -167,8 +178,7 @@ DATA_LABEL_TO_COORDINATES = {
 TIMESTAMP_COORDS = (530, 57, 897, 90)
 
 
-def process_obj(s3_key, s3_body, should_save_images_locally=False):
-    img = Image.open(s3_body)
+def process_obj(s3_key, img, should_save_images_locally=False):
     cropped = img.crop(box=TIMESTAMP_COORDS)
 
     timestamp_string = get_text(cropped)
@@ -189,6 +199,7 @@ def process_obj(s3_key, s3_body, should_save_images_locally=False):
             'S': datetime.strftime(timestamp, '%Y-%m-%d')
         },
         DynamoSchema.HOUR_OF_DAY: {'N': str(timestamp.hour)},
+        DynamoSchema.TIMESTAMP: {'N': str(int(timestamp.timestamp()))},
     }
 
     for label, coords in DATA_LABEL_TO_COORDINATES.items():
@@ -203,7 +214,7 @@ def process_obj(s3_key, s3_body, should_save_images_locally=False):
             cropped_keyname = label.get_s3_img_keyname(s3_key)
             item_value = cropped_keyname
             if not should_save_images_locally:
-                upload_img_to_s3(cropped, cropped_keyname)
+                upload_img_to_s3(cropped_keyname, cropped)
 
         try:
             value = label.get_dynamo_value(item_value)
@@ -224,16 +235,32 @@ def process_obj(s3_key, s3_body, should_save_images_locally=False):
     return dynamo_item_dict
 
 
+def upload_caspar_creek_gif_to_s3():
+    now = datetime.utcnow().strftime('%Y-%m-%d_%H-%M-%S')
+    s3_key = now + '.gif'
+
+    with urllib.request.urlopen(GIF_URL) as response:
+        img = Image.open(response)
+        s3_client.put_object(
+            Body=response.read(),
+            Bucket='caspar-creek-data',
+            Key=s3_key,
+        )
+
+    upload_img_to_s3(s3_key, img)
+    return s3_key, img
+
+
 def get_s3_obj(key):
     return s3_client.get_object(Key=key, Bucket=S3_BUCKET)
 
 
 def process_s3_key(key, should_save_locally=False):
     obj = get_s3_obj(key)
-    return process_obj(key, obj['Body'], should_save_locally)
+    return process_obj(key, Image.open(obj['Body']), should_save_locally)
 
 
 def process_all():
     for obj in s3_bucket.objects.all():
         if not obj.key.startswith(CROPS_DIR):
-            process_obj(obj.key, obj.get()['Body'])
+            process_obj(obj.key, Image.open(obj.get()['Body']))
