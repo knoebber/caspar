@@ -1,15 +1,15 @@
 :root {
-  --font-size-big: 25px;
-  --font-size-medium: 20px;
-  --font-size-small: 12px;
+    --font-size-big: 25px;
+    --font-size-medium: 20px;
+    --font-size-small: 12px;
 }
 
 *, *::before, *::after {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 * {
-  margin: 0;
+    margin: 0;
 }
 
 html {
@@ -32,13 +32,12 @@ h1 {
 }
 
 body {
-  line-height: 1.5;
-  -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
 }
 
 img {
-  display: block;
-  max-width: 100%;
+    display: block;
 }
 
 input, button, textarea, select {
@@ -51,10 +50,22 @@ input, button, textarea, select {
     display: flex;
 }
 
+@media (min-width: 1413px) {
+    height: 341px;
+}
 
 @media (max-width: 1412px) {
     .img-row {
+	height: 626px;
 	align-items: center;
 	flex-direction: column;
+    }
+
+}
+
+@media (max-width:  800px) {
+    img {
+	heigth: 100%;
+	width: 100%;
     }
 }

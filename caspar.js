@@ -24,7 +24,8 @@ function getData(date) {
 }
 
 function renderImg(selector, s3Path) {
-  img = document.querySelectorAll(selector)[0].src = `${bucketUrl}/${s3Path}`;
+  img = document.querySelectorAll(selector)[0];
+  img.src = `${bucketUrl}/${s3Path}`;
 }
 
 function renderDataItem(dataItem) {
@@ -57,5 +58,5 @@ function renderDataItem(dataItem) {
 getData(new Date())
   .then((data) => {
     // TODO: might break at uct midnight
-    renderDataItem(data.at(-1));
+    renderDataItem(data[data.length - 1]);
   });
