@@ -4,6 +4,8 @@
     --font-size-small: 12px;
 }
 
+/* TODO: fix content shifts on all screen sizes */
+
 *, *::before, *::after {
     box-sizing: border-box;
 }
@@ -51,7 +53,9 @@ input, button, textarea, select {
 }
 
 @media (min-width: 1413px) {
-    height: 341px;
+    .img-row {
+	height: 341px;
+    }
 }
 
 @media (max-width: 1412px) {
