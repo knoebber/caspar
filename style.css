@@ -1,3 +1,60 @@
+:root {
+  --font-size-big: 25px;
+  --font-size-medium: 20px;
+  --font-size-small: 12px;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+}
+
+html {
+    font-family: 'Roboto', sans-serif;
+    color: var(--black);
+    font-size: var(--font-size-medium);
+    margin: 5px;
+}
+
+main {
+}
+
+footer {
+    display: flex;
+    flex-direction: column;
+}
+
 h1 {
-    color: pink;
+    font-size: var(--font-size-big);
+}
+
+body {
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+input, button, textarea, select {
+  font: inherit;
+}
+
+
+
+.img-row {
+    display: flex;
+}
+
+
+@media (max-width: 1412px) {
+    .img-row {
+	align-items: center;
+	flex-direction: column;
+    }
 }

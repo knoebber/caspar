@@ -2,7 +2,8 @@
 
 Transforms http://fs-server.humboldt.edu/RTMC/SFCaspar_DetailView.gif into https://knoebber.github.io/caspar/
 
-This is not affiliated with Jackson State Forest, Cal Poly Humboldt, or the US forest service.
+This repository is not affiliated with Jackson State Forest, Cal Poly
+Humboldt, or the US forest service.
 
 
 ## AWS Architecture
