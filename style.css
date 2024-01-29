@@ -56,7 +56,6 @@ input, button, textarea, select {
 
 @media (max-width: 1412px) {
     .img-row {
-	height: 626px;
 	align-items: center;
 	flex-direction: column;
     }
