@@ -8,7 +8,7 @@ Humboldt, or the US forest service.
 
 ## AWS Architecture
 
-1. 30min Event Bridge timer
-2. Parse data in lambda with Tesseract OCR
+1. Event Bridge cron job
+2. Parse data in Lambda with Tesseract OCR
 3. Store image in S3
 4. Store data in Dynamo

@@ -1,22 +1,11 @@
 const apiUrl = 'https://6llfk2y33ccofsvg6zaw2xy4wu0qspjw.lambda-url.us-west-2.on.aws';
 const bucketUrl = 'https://caspar-creek-data.s3.us-west-2.amazonaws.com'
 
-/**
-   E.G:
+const keyToLabel = {
+  daily_rainfall: '24 hour rainfall',
+};
 
-   "annual_rainfall": "24.88",
-   "bottle_count": "0",
-   "daily_rainfall": "0.01",
-   "date_string": "2024-01-29",
-   "graph_image_s3_path": "crops/caspar_creek_1706500385_graph_image.gif",
-   "hour_of_day": "3",
-   "s3_key": "caspar_creek_1706500385.gif",
-   "stage": "0.88",
-   "temperature": "53.4",
-   "turbidity": "10",
-   "unix_timestamp": "1706500385",
-   "weir_image_s3_path": "crops/caspar_creek_1706500385_weir_image.gif"
-*/
+
 function getData(date) {
   date_string = date.toISOString().replaceAll(/T.+/g, '')
   return fetch(`${apiUrl}?date=${date_string}`)
@@ -39,21 +28,23 @@ function renderDataItem(dataItem) {
   lineItems = document.querySelectorAll('.js-data-line-items')[0];
 
   [
+    'stage',
+    'daily_rainfall',
+    'turbidity',
     'annual_rainfall',
     'bottle_count',
-    'daily_rainfall',
-    'stage',
     'temperature',
-    'turbidity',
   ].forEach((dataKey) => {
     const div = document.createElement('div');
-
-    const dataText = `${dataKey.replaceAll('_', ' ')}: ${dataItem[dataKey]}`
+    const label = keyToLabel[dataKey] || dataKey.replaceAll('_', ' ');
+    const dataText = `${label}: ${dataItem[dataKey]}`
+    div.classList.add(dataKey.replace('_', '-'));
     div.appendChild(document.createTextNode(dataText));
     lineItems.appendChild(div);
   });
 
 }
+
 
 getData(new Date())
   .then((data) => {
