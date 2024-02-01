@@ -39,6 +39,7 @@ footer {
 
 h1 {
     font-size: var(--font-size-big);
+    text-align: center;
 }
 
 body {
