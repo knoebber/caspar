@@ -54,7 +54,7 @@ class HourlyDataItem {
 
   get bottleCount() {
     return {
-      label: 'Bottle Count',
+      label: 'Bottle count',
       selector: '.js-bottle-count',
       value: parseInt(this.dataItem.bottle_count, 10) || 0,
     };
@@ -62,7 +62,7 @@ class HourlyDataItem {
 
   get dailyRainfall() {
     return {
-      label: '24 Hour Rainfall',
+      label: '24 hour rainfall',
       selector: '.js-daily-rainfall',
       value: parseFloat(this.dataItem.daily_rainfall) || 0,
     };
@@ -70,7 +70,7 @@ class HourlyDataItem {
 
   get seasonRainfall() {
     return {
-      label: 'Season Rainfall',
+      label: 'Season rainfall',
       selector: '.js-season-rainfall',
       value: parseFloat(this.dataItem.annual_rainfall) || 0,
     };
@@ -176,6 +176,7 @@ class Controller {
   async sync() {
     window.history.replaceState({urlKey: this.viewKey }, '', `?${urlKey}=${this.viewKey}`);
     (await this.getHourlyDataItem(this.viewedDate)).render();
+    this.renderCalculatedRain();
   }
 
   async calcHourlyRain() {
@@ -195,7 +196,6 @@ class Controller {
     }
 
     if (startData) {
-      console.log('found', startData.key, 'no 24 hours of rain');
       const startDate = startData.date
       this.hourlyRainCache[startData.key] = 0;
 
@@ -203,8 +203,6 @@ class Controller {
       for (let i = 0; i < 24; i +=1) {
 	this.hourlyRainCache[makeHourKey(new Date(startDate.valueOf() - (msInHour * i)))] = 0;
       }
-
-      console.log({...this.hourlyRainCache});
 
       const currentMs = this.viewedDate.valueOf();
       let msCursor = startDate.valueOf() + msInHour;
@@ -216,39 +214,17 @@ class Controller {
 	const dailyRainfall = hourlyData.dailyRainfall.value;
 	const oneDayAgo = new Date(msCursor - (msInHour * 24));
 
-	// console.log(new Date(msCursor), 'dailyRainfall=',dailyRainfall);
-	// console.log('previousDailyRainfall=',previousDailyRainfall, 'date=', oneDayAgo, 'key=', makeHourKey(oneDayAgo));
-
 	const hourlyRain24HoursAgo = this.hourlyRainCache[makeHourKey(oneDayAgo)]
 	const hourlyRainfall = roundTwoPlaces((dailyRainfall - previousDailyRainfall) + hourlyRain24HoursAgo);
 	this.hourlyRainCache[key] = !hourlyRainfall || hourlyRainfall < 0 ? 0 : hourlyRainfall;
-	if (hourlyRain24HoursAgo > 0) {
-	  console.log('===')
-	  console.log('dailyRainfall', dailyRainfall);
-	  console.log('previousDailyRainfall', previousDailyRainfall);
-	  console.log('hourlyRain24HoursAgo', hourlyRain24HoursAgo);
-	  console.log('calculated', this.hourlyRainCache[key]);
-	}
-
 	previousDailyRainfall = hourlyData.dailyRainfall.value;
 	msCursor += msInHour;
       }
-      console.log(this.hourlyRainCache);
 
       const hourlyInchKeys = Object.keys(this.hourlyRainCache);
       hourlyInchKeys.sort((a, b) => {
 	return parseDateFromHourKey(a).valueOf() > parseDateFromHourKey(b).valueOf();
       });
-
-      console.log({...this.hourlyRainCache});
-
-      hourlyInchKeys.forEach((key, i) => {
-	const val = this.hourlyRainCache[key];
-	const display = val ? val.toFixed(2) : val;
-	console.log(`(${i}) LOCAL DATE="${new Date(parseDateFromHourKey(key)).toLocaleString()}" KEY="${key}": ${display}`);
-      });
-
-      return;
     } else {
       console.warning('could not calculate hourly rain for', this.viewKey);
     }
@@ -256,34 +232,42 @@ class Controller {
 
   async calcThreeDayRain() {
     const currentMs = this.viewedDate.valueOf();
-    let total = 0;
-    let hourlyData;
-    for (let i = 0; i < 3; i +=1 ) {
-      hourlyData = await this.getHourlyDataItem(new Date(currentMs - (msInHour * 24 * i)));
-      if (hourlyData.hasData) {
-	total += parseFloat(hourlyData.dailyRainfall.value);
-      } else {
-	total = null;
-	break;
-      }
-    }
-    this.threeDayRainCache[this.viewKey] = total;
-    return total;
+    const hourlyPromises = Array
+      .from({ length: 3})
+      .map((_, i) => this.getHourlyDataItem(new Date(currentMs - (msInHour * 24 * i))));
+
+    this.threeDayRainCache[this.viewKey] = roundTwoPlaces(
+      (await Promise.all(hourlyPromises))
+	.reduce((acc, current) => {
+	  if (acc !== null && current.hasData) {
+	    return acc + current.dailyRainfall.value;
+	  } else {
+	    return null;
+	  }
+      }, 0));
   }
 
-  async getCalculatedRain() {
+  async renderCalculatedRain() {
     let hourlyRain = this.hourlyRainCache[this.viewKey];
     let threeDayRain = this.threeDayRainCache[this.viewKey];
 
     if (hourlyRain === undefined) {
       await this.calcThreeDayRain();
-      threeDayRain = this.threeDayRainCache[this.viewKey]
+      threeDayRain = this.threeDayRainCache[this.viewKey];
     }
     if (hourlyRain === undefined) {
+      await this.calcHourlyRain();
       hourlyRain = this.hourlyRainCache[this.viewKey];
     }
 
-    return { threeDayRain, hourlyRain };
+    hourlyRain = hourlyRain ?? '?';
+    threeDayRain = threeDayRain ?? '?';
+
+    console.log(this.threeDayRainCache);
+    console.log(this.hourlyRainCache);
+
+    selectFirst('.js-72-hour-rainfall').innerHTML = `72 hour rain: ${threeDayRain}`;
+    selectFirst('.js-1-hour-rainfall').innerHTML = `1 hour rain: ${hourlyRain}`;
   }
 
   setViewedDay(day) {
