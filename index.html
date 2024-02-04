@@ -8,11 +8,32 @@
   </head>
   <body>
     <main>
-      <h1>Caspar <span class="js-date"></span></h1>
-      <div class="js-data-line-items data-line-items"></div>
+      <h1>Caspar <span class="js-header-span"></span></h1>
+      <div class="ui">
+	<div class="ui-row">
+	  <button class="js-last-day" type="button">⬅️ 📅</button>
+	  <button class="js-last-hour" type="button">⬅️ ⌛️</button>
+	  <button class="js-now" type="button">🌞</button>
+	  <button class="js-next-hour" type="button">⏳ ➡️</button>
+	  <button class="js-next-day" type="button">📅 ➡️</button>
+	</div>
+	<div class="ui-row">
+	  <button class="js-movie" type="button">🎥</button>
+	</div>
+	</div>
+      </div>
+      <div class="js-data-line-items data-line-items">
+	<span class="js-bottle-count bottle-count"></span>
+	<span class="js-daily-rainfall daily-hour-rainfall"></span>
+	<span class="js-season-rainfall season-rainfall"></span>
+	<span class="js-stage stage"></span>
+	<span class="js-turbidity turbidity"></span>
+	<span class="js-temperature temperature"></span>
+      </div>
+      <div class="js-rain"></div>
       <div class="img-row">
-	<img class="js-weir-image">
 	<img class="js-graph-image">
+	<img class="js-weir-image">
       </div>
     </main>
     <footer>

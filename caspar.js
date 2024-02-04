@@ -1,51 +1,29 @@
 const apiUrl = 'https://6llfk2y33ccofsvg6zaw2xy4wu0qspjw.lambda-url.us-west-2.on.aws';
 const bucketUrl = 'https://caspar-creek-data.s3.us-west-2.amazonaws.com'
 
-const msInHour = 3600*1000;
-const keyToLabel = {
-  daily_rainfall: '24 hour rainfall',
-};
+function getBucketPath(key) {
+  return `${bucketUrl}/${key}`;
+}
 
-const dataKeys = [
-  'stage',
-  'daily_rainfall',
-  'turbidity',
-  'annual_rainfall',
-  'bottle_count',
-  'temperature',
-];
+const msInHour = 36E5;
 
 const urlKey = 'date';
 
-function renderImg(selector, s3Path) {
-  const img = document.querySelectorAll(selector)[0];
-  if (s3Path) {
-    img.src = `${bucketUrl}/${s3Path}`;
-  } else {
-    img.src = '';
-  }
+function roundTwoPlaces(n) {
+  return Math.round(n*100)/100;
+} 
+
+function parseDateFromHourKey(hourKey) {
+  const [year, month, day, hour] = hourKey
+    .replaceAll(/[-T]/g, ' ')
+    .split(' ');
+  
+  return new Date(Date.UTC(year, month - 1, day, hour, 0, 0, 0));
+
 }
 
-function renderDataItem(dataItem) {
-  renderImg('.js-weir-image', dataItem.weir_image_s3_path);
-  renderImg('.js-graph-image', dataItem.graph_image_s3_path);
-
-  document
-    .querySelectorAll('.js-date')[0]
-    .innerHTML = new Date(parseInt(dataItem.unix_timestamp, 10) * 1000).toLocaleString();
-
-  lineItems = document.querySelectorAll('.js-data-line-items')[0];
-  lineItems.innerHTML = '';
-
-  dataKeys.forEach((dataKey) => {
-    const div = document.createElement('div');
-    const label = keyToLabel[dataKey] || dataKey.replaceAll('_', ' ');
-    const dataText = `${label}: ${dataItem[dataKey]}`
-    div.classList.add(dataKey.replace('_', '-'));
-    div.appendChild(document.createTextNode(dataText || '-'));
-    lineItems.appendChild(div);
-  });
-
+function selectFirst(selector) {
+  return document.querySelectorAll(selector)[0];
 }
 
 function makeHourKey(date) {
@@ -56,124 +34,346 @@ function makeDayKey(date) {
   return date.toISOString().replaceAll(/T.+/g, '');
 }
 
-class Repo {
-  constructor() {
-    this.data = {};
+class HourlyDataItem {
+  constructor(d) {
+    this.maybeNullData = d;
+    this.hasData = d !== null;
   }
 
-  isEmpty() {
-    return Object.keys(this.data).length === 0;
+  get date() {
+    return this.hasData ? new Date(parseInt(this.maybeNullData.unix_timestamp, 10) * 1000) : null;
   }
 
-  setHour(hourData) {
-    this.data[makeHourKey(new Date(hourData.unix_timestamp * 1000))] = hourData;
+  get key() {
+    return this.hasData ? makeHourKey(this.date) : null;
   }
 
-  async getHour(date) {
-    const hourKey = makeHourKey(date);
-    if (!(hourKey in this.data)) {
-      console.log('fetching', hourKey);
-      await this.fetchDay(date);
+  get dataItem() {
+    return this.maybeNullData ?? {};
+  }
+
+  get bottleCount() {
+    return {
+      label: 'Bottle Count',
+      selector: '.js-bottle-count',
+      value: parseInt(this.dataItem.bottle_count, 10) || 0,
+    };
+  }
+
+  get dailyRainfall() {
+    return {
+      label: '24 Hour Rainfall',
+      selector: '.js-daily-rainfall',
+      value: parseFloat(this.dataItem.daily_rainfall) || 0,
+    };
+  }
+
+  get seasonRainfall() {
+    return {
+      label: 'Season Rainfall',
+      selector: '.js-season-rainfall',
+      value: parseFloat(this.dataItem.annual_rainfall) || 0,
+    };
+  }
+
+  get stage() {
+    return {
+      label: 'Stage',
+      selector: '.js-stage',
+      value: parseFloat(this.dataItem.stage) || 0,
+    };
+  }
+
+  get temperature() {
+    return {
+      label: 'Temperature',
+      selector: '.js-temperature',
+      value: parseFloat(this.dataItem.temperature) || 0,
+    };
+  }
+
+  get turbidity() {
+    return {
+      label: 'Turbidity',
+      selector: '.js-turbidity',
+      value: parseFloat(this.dataItem.turbidity) || 0,
+    };
+  }
+
+  render() {
+    const headerSpan = selectFirst('.js-header-span');
+    const weirImage = selectFirst('.js-weir-image');
+    const graphImage = selectFirst('.js-graph-image');
+
+    if (this.hasData) {
+      graphImage.src = getBucketPath(this.maybeNullData.graph_image_s3_path);
+      weirImage.src = getBucketPath(this.maybeNullData.weir_image_s3_path);
+      headerSpan.innerHTML = this.date.toLocaleString();
     } else {
-      console.log('cache hit for', hourKey);
+      weirImage.src = '';
+      graphImage.src = '';
+      headerSpan.innerHTML = 'no data';
     }
 
-    return this.data[hourKey];
-  }
-
-  async fetchDay(date) {
-    const resp = await fetch(`${apiUrl}?date=${makeDayKey(date)}`);
-    const dataItems = await resp.json();
-    dataItems.forEach((hourData) => {
-      this.setHour(hourData);
+    [
+      this.bottleCount,
+      this.dailyRainfall,
+      this.seasonRainfall,
+      this.stage,
+      this.temperature,
+      this.turbidity,
+    ].forEach(({ label, selector, value }) => {
+      selectFirst(selector).innerHTML = `${label}: ${value}`;
     });
   }
 }
 
-class State {
+class Controller {
   constructor() {
-    this.date = null;
+    this.viewedDate = null;
+    this.responseCache = {};
+    this.hourlyRainCache = {};
+    this.threeDayRainCache = {};
   }
 
-  initialize() {
-    const key = new URLSearchParams(window.location.search)[urlKey];
-    if (key) {
-      [year, month, day, hour] = key.replaceAll(/[-T]/g, ' ').split(' ') 
-      this.date = new Date(Date.UTC(year, month - 1, hour, 0, 0, 0))
-    } 
+  get viewKey() {
+    return makeHourKey(this.viewedDate);
   }
 
-  syncUrl() {
-    const value = makeHourKey(this.date);
-    // window.location.search = `?${urlKey}=${key}`;
-    window.history.replaceState({urlKey: value }, '', `?${urlKey}=${value}`);
+  get currentPromise() {
+    return this.responseCache[this.viewKey];
   }
 
-  setDay(day) {
-    this.date.setDate(day);
-    this.syncUrl();
+
+  async initialize() {
+    const urlValue = new URLSearchParams(window.location.search).get(urlKey);
+    if (urlValue) {
+      this.viewedDate = parseDateFromHourKey(urlValue);
+      this.sync();
+    } else {
+      this.syncLatest();
+    }
+
   }
 
-  previousDay() {
-    this.setDay(this.date.getDate() - 1);
+  async getHourlyDataItem(date) {
+    const dayKey = makeDayKey(date);
+
+    let dataPromise = this.responseCache[dayKey];
+    if (!dataPromise) {
+      dataPromise = fetch(`${apiUrl}?date=${dayKey}`).then((resp) => resp.json());
+      this.responseCache[dayKey] = dataPromise;
+    }
+
+    const dailyData = await dataPromise;
+    return new HourlyDataItem(dailyData[date.getUTCHours()] || null);
   }
 
-  nextDay() {
-    this.setDay(this.date.getDate() + 1);
+  getDataForHourDelta(startData, hourDelta) {
+    return this.getHourlyDataItem(new Date(startData.date.valueOf() + (msInHour * hourDelta)));
   }
 
-  setHour(hour) {
-    this.date.setHours(hour);
-    this.syncUrl();
+  async sync() {
+    window.history.replaceState({urlKey: this.viewKey }, '', `?${urlKey}=${this.viewKey}`);
+    (await this.getHourlyDataItem(this.viewedDate)).render();
   }
 
-  previousHour() {
-    this.setHour(this.date.getHours() - 1);
+  async calcHourlyRain() {
+    // If there are this many straight days of rain, give up.
+    const maxLookbackDays = 14;
+
+    const currentMs = this.viewedDate.valueOf();
+    let startData = null;
+
+    for (let i = 0; i < maxLookbackDays * 24; i += 1) {
+      const rainCheckDate = new Date(currentMs - (msInHour * i));
+      const hourlyData = await this.getHourlyDataItem(rainCheckDate);
+      if (hourlyData.hasData && hourlyData.dailyRainfall.value === 0) {
+	startData = hourlyData;
+	break;
+      }
+    }
+
+    if (startData) {
+      console.log('found', startData.key, 'no 24 hours of rain');
+      const startDate = startData.date
+      this.hourlyRainCache[startData.key] = 0;
+
+      // 24 hours previous to this have 0 inches per hour
+      for (let i = 0; i < 24; i +=1) {
+	this.hourlyRainCache[makeHourKey(new Date(startDate.valueOf() - (msInHour * i)))] = 0;
+      }
+
+      console.log({...this.hourlyRainCache});
+
+      const currentMs = this.viewedDate.valueOf();
+      let msCursor = startDate.valueOf() + msInHour;
+      let previousDailyRainfall = startData.dailyRainfall.value;
+
+      while (msCursor < currentMs) {
+	const hourlyData = await this.getHourlyDataItem(new Date(msCursor));
+	const key = hourlyData.key;
+	const dailyRainfall = hourlyData.dailyRainfall.value;
+	const oneDayAgo = new Date(msCursor - (msInHour * 24));
+
+	// console.log(new Date(msCursor), 'dailyRainfall=',dailyRainfall);
+	// console.log('previousDailyRainfall=',previousDailyRainfall, 'date=', oneDayAgo, 'key=', makeHourKey(oneDayAgo));
+
+	const hourlyRain24HoursAgo = this.hourlyRainCache[makeHourKey(oneDayAgo)]
+	const hourlyRainfall = roundTwoPlaces((dailyRainfall - previousDailyRainfall) + hourlyRain24HoursAgo);
+	this.hourlyRainCache[key] = !hourlyRainfall || hourlyRainfall < 0 ? 0 : hourlyRainfall;
+	if (hourlyRain24HoursAgo > 0) {
+	  console.log('===')
+	  console.log('dailyRainfall', dailyRainfall);
+	  console.log('previousDailyRainfall', previousDailyRainfall);
+	  console.log('hourlyRain24HoursAgo', hourlyRain24HoursAgo);
+	  console.log('calculated', this.hourlyRainCache[key]);
+	}
+
+	previousDailyRainfall = hourlyData.dailyRainfall.value;
+	msCursor += msInHour;
+      }
+      console.log(this.hourlyRainCache);
+
+      const hourlyInchKeys = Object.keys(this.hourlyRainCache);
+      hourlyInchKeys.sort((a, b) => {
+	return parseDateFromHourKey(a).valueOf() > parseDateFromHourKey(b).valueOf();
+      });
+
+      console.log({...this.hourlyRainCache});
+
+      hourlyInchKeys.forEach((key, i) => {
+	const val = this.hourlyRainCache[key];
+	const display = val ? val.toFixed(2) : val;
+	console.log(`(${i}) LOCAL DATE="${new Date(parseDateFromHourKey(key)).toLocaleString()}" KEY="${key}": ${display}`);
+      });
+
+      return;
+    } else {
+      console.warning('could not calculate hourly rain for', this.viewKey);
+    }
   }
 
-  nextHour() {
-    this.setHour(this.date.getHours() + 1);
+  async calcThreeDayRain() {
+    const currentMs = this.viewedDate.valueOf();
+    let total = 0;
+    let hourlyData;
+    for (let i = 0; i < 3; i +=1 ) {
+      hourlyData = await this.getHourlyDataItem(new Date(currentMs - (msInHour * 24 * i)));
+      if (hourlyData.hasData) {
+	total += parseFloat(hourlyData.dailyRainfall.value);
+      } else {
+	total = null;
+	break;
+      }
+    }
+    this.threeDayRainCache[this.viewKey] = total;
+    return total;
+  }
+
+  async getCalculatedRain() {
+    let hourlyRain = this.hourlyRainCache[this.viewKey];
+    let threeDayRain = this.threeDayRainCache[this.viewKey];
+
+    if (hourlyRain === undefined) {
+      await this.calcThreeDayRain();
+      threeDayRain = this.threeDayRainCache[this.viewKey]
+    }
+    if (hourlyRain === undefined) {
+      hourlyRain = this.hourlyRainCache[this.viewKey];
+    }
+
+    return { threeDayRain, hourlyRain };
+  }
+
+  setViewedDay(day) {
+    this.viewedDate.setDate(day);
+    this.sync();
+  }
+
+  async syncLatest() {
+    const now = new Date();
+    const cacheKey = makeDayKey(now);
+    delete this.responseCache[cacheKey];
+    this.viewedDate = now;
+    const dataItem = await this.getHourlyDataItem(this.viewedDate);
+    if (!dataItem.hasData) {
+      this.viewPreviousHour();
+    } else {
+      this.sync();
+    }
+  }
+
+  viewPreviousDay() {
+    this.setViewedDay(this.viewedDate.getDate() - 1);
+  }
+
+  viewNextDay() {
+    this.setViewedDay(this.viewedDate.getDate() + 1);
+  }
+
+  setViewedHour(hour) {
+    this.viewedDate.setHours(hour);
+    this.sync();
+  }
+
+  viewPreviousHour() {
+    this.setViewedHour(this.viewedDate.getHours() - 1);
+  }
+
+  viewNextHour() {
+    this.setViewedHour(this.viewedDate.getHours() + 1);
   }
 }
 
-async function main(repo, state) {
+async function main(controller) {
+  controller.initialize();
+  await controller.calcHourlyRain();
 
-  state.initialize();
-
-  let dataItem;
-
-  if (state.date) {
-    dataItem  = await repo.getHour(state.date);
-  } else  {
-    const initialDate = new Date();
-    dataItem = await repo.getHour(initialDate);
-    if (!dataItem) {
-      initialDate.setHours(initialDate.getHours() - 1);
-      dataItem = await repo.getHour(initialDate);
+  document.onkeydown = async ({ code }) => {
+    switch (code) {
+    case 'ArrowLeft':
+      await controller.currentPromise;
+      controller.viewPreviousHour();
+      break;
+    case 'ArrowRight':
+      await controller.currentPromise;
+      controller.viewNextHour();
+      break;
     }
+  };
 
-    state.date = initialDate;
-  }
-
-  renderDataItem(dataItem || {});
-
-  
-  document.onkeydown = async ({ which }) => {
-    if (which === 37) {
-      // left arrow
-      state.previousHour();
-      dataItem = await repo.getHour(state.date);
-      renderDataItem(dataItem || {});
-    } else if (which === 39) {
-      // right arrow
-      state.nextHour();
-      dataItem = await repo.getHour(state.date);
-      renderDataItem(dataItem || {});
-    }
-  }
+  [
+    {
+      selector: '.js-last-day',
+      method: 'viewPreviousDay',
+    },
+    {
+      selector: '.js-last-hour',
+      method: 'viewPreviousHour',
+    },
+    {
+      selector: '.js-now',
+      method: 'syncLatest',
+    },
+    {
+      selector: '.js-next-hour',
+      method: 'viewNextHour',
+    },
+    {
+      selector: '.js-next-day',
+      method: 'viewNextDay',
+    },
+  ].forEach(({ selector, method }) => {
+    selectFirst(selector).onclick = async () => {
+      await controller.currentPromise;
+      controller[method]();
+    };
+  });
 }
 
-const repo = new Repo();
-const state = new State();
 
-main(repo, state);
+// Global scope so it's easy to mess with in console.
+const controller = new Controller();
+main(controller);
+
