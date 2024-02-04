@@ -180,54 +180,14 @@ class Controller {
   }
 
   async calcHourlyRain() {
-    // If there are this many straight days of rain, give up.
-    const maxLookbackDays = 14;
+    const currentData = await this.getHourlyDataItem(this.viewedDate);
+    const lastHourData = await this.getDataForHourDelta(currentData, -1);
 
-    const currentMs = this.viewedDate.valueOf();
-    let startData = null;
-
-    for (let i = 0; i < maxLookbackDays * 24; i += 1) {
-      const rainCheckDate = new Date(currentMs - (msInHour * i));
-      const hourlyData = await this.getHourlyDataItem(rainCheckDate);
-      if (hourlyData.hasData && hourlyData.dailyRainfall.value === 0) {
-	startData = hourlyData;
-	break;
-      }
+    let value = null;
+    if (currentData.hasData && lastHourData.hasData) {
+      value = roundTwoPlaces(currentData.seasonRainfall.value -lastHourData.seasonRainfall.value);
     }
-
-    if (startData) {
-      const startDate = startData.date
-      this.hourlyRainCache[startData.key] = 0;
-
-      // 24 hours previous to this have 0 inches per hour
-      for (let i = 0; i < 24; i +=1) {
-	this.hourlyRainCache[makeHourKey(new Date(startDate.valueOf() - (msInHour * i)))] = 0;
-      }
-
-      const currentMs = this.viewedDate.valueOf();
-      let msCursor = startDate.valueOf() + msInHour;
-      let previousDailyRainfall = startData.dailyRainfall.value;
-
-      while (msCursor < currentMs) {
-	const hourlyData = await this.getHourlyDataItem(new Date(msCursor));
-	const key = hourlyData.key;
-	const dailyRainfall = hourlyData.dailyRainfall.value;
-	const oneDayAgo = new Date(msCursor - (msInHour * 24));
-
-	const hourlyRain24HoursAgo = this.hourlyRainCache[makeHourKey(oneDayAgo)]
-	const hourlyRainfall = roundTwoPlaces((dailyRainfall - previousDailyRainfall) + hourlyRain24HoursAgo);
-	this.hourlyRainCache[key] = !hourlyRainfall || hourlyRainfall < 0 ? 0 : hourlyRainfall;
-	previousDailyRainfall = hourlyData.dailyRainfall.value;
-	msCursor += msInHour;
-      }
-
-      const hourlyInchKeys = Object.keys(this.hourlyRainCache);
-      hourlyInchKeys.sort((a, b) => {
-	return parseDateFromHourKey(a).valueOf() > parseDateFromHourKey(b).valueOf();
-      });
-    } else {
-      console.warning('could not calculate hourly rain for', this.viewKey);
-    }
+    this.hourlyRainCache[this.viewKey] = value;
   }
 
   async calcThreeDayRain() {
