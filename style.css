@@ -15,8 +15,6 @@
     --font-size-small: 12px;
 }
 
-/* TODO: fix content shifts on all screen sizes */
-
 *, *::before, *::after {
     box-sizing: border-box;
 }
@@ -68,9 +66,6 @@ input, button, textarea, select {
 }
 
 button {
-    &:hover {
-	background-color: var(--bg-color);
-    }
     background-color: var(--white);
     border-radius: var(--border-radius);
     border: none;
@@ -78,6 +73,10 @@ button {
     cursor: pointer;
     height: fit-content;
     padding: 5px;
+}
+
+button:hover {
+    background-color: var(--bg-color);
 }
 
 .img-row {
@@ -123,10 +122,6 @@ button {
 }
 
 .now-button {
-    &.past-view {
-	background-color: var(--tertiary-bg-color);
-    }
-
     width: 125px;
 }
 
@@ -138,20 +133,22 @@ button {
     gap: 32px;
     margin: 5px;
   
-    div {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-    }
-
-    .value, .unit {
-	font-weight: 700;
-    }
-
-    .unit {
-	margin-left: 3px;
-    }
 }
+
+.data-line-items div {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.value, .unit {
+    font-weight: 700;
+}
+
+.unit {
+    margin-left: 3px;
+}
+
 
 @media (min-width: 1413px) {
     /* Big screen */
