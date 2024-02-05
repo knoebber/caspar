@@ -5,24 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Caspar</title>
     <link rel="stylesheet" href="style.css">
+    <!-- <link rel="stylesheet" href="loader.css"> -->
     <link rel="shortcut icon" type="image/x-icon" href="favicon.ico">
   </head>
   <body>
     <main>
-      <h1>Caspar <span class="js-header-span"></span></h1>
-      <div class="ui">
-	<div class="ui-row">
-	  <button class="js-last-day" type="button">⬅️ 📅</button>
-	  <button class="js-last-hour" type="button">⬅️ ⌛️</button>
-	  <button class="js-now" type="button">🌞</button>
-	  <button class="js-next-hour" type="button">⏳ ➡️</button>
-	  <button class="js-next-day" type="button">📅 ➡️</button>
+    <div class="top-ui-row">
+      <div class="top-button-container">
+	<div class="button-group">
+	  <button title="1 day back (shift left arrow)" class="js-last-day" type="button">⬅️ 📅</button>
+	  <button title="1 hour back (left arrow)" class="js-last-hour" type="button">⬅️ ⌛️</button>
 	</div>
-	<div class="ui-row">
-	  <button class="js-movie" type="button">🎥</button>
+	<div class="button-group">
+	  <button title="1 hour forward (right arrow)" class="js-next-hour" type="button">⏳ ➡️</button>
+	  <button title="1 day forward (shift right arrow)" class="js-next-day" type="button">📅 ➡️</button>
 	</div>
-	</div>
+	<button title="refresh and view current data" class="js-now now-button" type="button">loading 🔄️</button>
       </div>
+    </div>
+      <h1>Caspar <span class="js-header-span"></span></span></h1>
       <div class="js-data-line-items data-line-items">
 	<span class="js-bottle-count bottle-count"></span>
 	<span class="js-stage stage"></span>
@@ -34,10 +35,13 @@
 	<span class="js-1-hour-rainfall 1-hour-rainfall"></span>
       </div>
       <div class="js-rain"></div>
-      <div class="img-row">
-	<img class="js-graph-image">
+      <div class="img-row hidden js-show-after-load">
+	<img class="js-graph-image graph-image">
 	<img class="js-weir-image">
       </div>
+	<div class="ui-row hidden js-show-after-load">
+	  <button class="js-movie" type="button">🎥</button>
+	</div>
     </main>
     <footer>
       <a href="http://fs-server.humboldt.edu/RTMC/SFCaspar_DetailView.gif">

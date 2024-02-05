@@ -35,9 +35,10 @@ function makeDayKey(date) {
 }
 
 class HourlyDataItem {
-  constructor(d) {
+  constructor(d, date) {
     this.maybeNullData = d;
     this.hasData = d !== null;
+    this.givenDate = date;
   }
 
   get date() {
@@ -112,7 +113,7 @@ class HourlyDataItem {
     } else {
       weirImage.src = '';
       graphImage.src = '';
-      headerSpan.innerHTML = 'no data';
+      headerSpan.innerHTML = `(no data ${this.givenDate.toLocaleString()})`;
     }
 
     [
@@ -129,11 +130,10 @@ class HourlyDataItem {
 }
 
 class Controller {
-  constructor() {
+  constructor(onFetch) {
     this.viewedDate = null;
     this.responseCache = {};
-    this.hourlyRainCache = {};
-    this.threeDayRainCache = {};
+    this.onFetch = onFetch;
   }
 
   get viewKey() {
@@ -162,15 +162,12 @@ class Controller {
     let dataPromise = this.responseCache[dayKey];
     if (!dataPromise) {
       dataPromise = fetch(`${apiUrl}?date=${dayKey}`).then((resp) => resp.json());
+      this.onFetch(dataPromise);
       this.responseCache[dayKey] = dataPromise;
     }
 
     const dailyData = await dataPromise;
-    return new HourlyDataItem(dailyData[date.getUTCHours()] || null);
-  }
-
-  getDataForHourDelta(startData, hourDelta) {
-    return this.getHourlyDataItem(new Date(startData.date.valueOf() + (msInHour * hourDelta)));
+    return new HourlyDataItem(dailyData[date.getUTCHours()] || null, date);
   }
 
   async sync() {
@@ -179,15 +176,18 @@ class Controller {
     this.renderCalculatedRain();
   }
 
+
   async calcHourlyRain() {
     const currentData = await this.getHourlyDataItem(this.viewedDate);
-    const lastHourData = await this.getDataForHourDelta(currentData, -1);
-
-    let value = null;
-    if (currentData.hasData && lastHourData.hasData) {
-      value = roundTwoPlaces(currentData.seasonRainfall.value -lastHourData.seasonRainfall.value);
+    let previousHourData = new HourlyDataItem(null);
+    if (currentData.hasData) {
+      const previousHour = new Date(currentData.date.valueOf() - msInHour);
+      previousHourData = await this.getHourlyDataItem(previousHour);
     }
-    this.hourlyRainCache[this.viewKey] = value;
+
+    return currentData.hasData && previousHourData.hasData
+      ? roundTwoPlaces(currentData.seasonRainfall.value - previousHourData.seasonRainfall.value)
+      :  null;
   }
 
   async calcThreeDayRain() {
@@ -196,7 +196,7 @@ class Controller {
       .from({ length: 3})
       .map((_, i) => this.getHourlyDataItem(new Date(currentMs - (msInHour * 24 * i))));
 
-    this.threeDayRainCache[this.viewKey] = roundTwoPlaces(
+    return roundTwoPlaces(
       (await Promise.all(hourlyPromises))
 	.reduce((acc, current) => {
 	  if (acc !== null && current.hasData) {
@@ -208,24 +208,8 @@ class Controller {
   }
 
   async renderCalculatedRain() {
-    let hourlyRain = this.hourlyRainCache[this.viewKey];
-    let threeDayRain = this.threeDayRainCache[this.viewKey];
-
-    if (hourlyRain === undefined) {
-      await this.calcThreeDayRain();
-      threeDayRain = this.threeDayRainCache[this.viewKey];
-    }
-    if (hourlyRain === undefined) {
-      await this.calcHourlyRain();
-      hourlyRain = this.hourlyRainCache[this.viewKey];
-    }
-
-    hourlyRain = hourlyRain ?? '?';
-    threeDayRain = threeDayRain ?? '?';
-
-    console.log(this.threeDayRainCache);
-    console.log(this.hourlyRainCache);
-
+    const threeDayRain = await this.calcThreeDayRain() ?? '?';
+    const hourlyRain = await this.calcHourlyRain() ?? '?';
     selectFirst('.js-72-hour-rainfall').innerHTML = `72 hour rain: ${threeDayRain}`;
     selectFirst('.js-1-hour-rainfall').innerHTML = `1 hour rain: ${hourlyRain}`;
   }
@@ -270,20 +254,50 @@ class Controller {
   }
 }
 
+let isFirstLoad = true;
+let isLoading = true;
+
+const nowButton = selectFirst('.js-now');
+const nowStartText = nowButton.innerHTML;
+
+async function onFetch(p) {
+  console.log('start await for', p);
+  nowButton.innerHTML = nowStartText;
+  await p;
+
+
+  nowButton.innerHTML = 'Most Recent';
+  if (isFirstLoad) {
+    document.querySelectorAll('.js-show-after-load').forEach((el) => {
+      el.classList.remove('hidden');
+    });
+    isFirstLoad = false;
+  }
+
+  isLoading = false;
+}
+
+const controller = new Controller(onFetch);
+
 async function main(controller) {
   controller.initialize();
   await controller.calcHourlyRain();
 
-  document.onkeydown = async ({ code }) => {
-    switch (code) {
+  document.onkeydown = async (e) => {
+    let controllerMethod;
+
+    switch (e.code) {
     case 'ArrowLeft':
-      await controller.currentPromise;
-      controller.viewPreviousHour();
+      controllerMethod = e.shiftKey ? 'viewPreviousDay' : 'viewPreviousHour';
       break;
     case 'ArrowRight':
-      await controller.currentPromise;
-      controller.viewNextHour();
+      controllerMethod = e.shiftKey ? 'viewNextDay' : 'viewNextHour';
       break;
+    }
+
+    if (controllerMethod) {
+      await controller.currentPromise;
+      controller[controllerMethod]();
     }
   };
 
@@ -317,7 +331,5 @@ async function main(controller) {
 }
 
 
-// Global scope so it's easy to mess with in console.
-const controller = new Controller();
 main(controller);
 
