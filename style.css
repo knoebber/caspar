@@ -6,11 +6,12 @@
 
     --bg-color: #f4ede6;
     --secondary-bg-color: #abbaca;
+    --tertiary-bg-color: #cf9475;
 
     --border-radius: 5px;
 
     --font-size-big: 25px;
-    --font-size-medium: 20px;
+    --font-size-medium: 18px;
     --font-size-small: 12px;
 }
 
@@ -67,23 +68,16 @@ input, button, textarea, select {
 }
 
 button {
-    background: var(--white);
+    &:hover {
+	background-color: var(--bg-color);
+    }
+    background-color: var(--white);
     border-radius: var(--border-radius);
     border: none;
     box-shadow: 2px 2px 2px 1px rgb(0 0 0 / 20%);
     cursor: pointer;
     height: fit-content;
     padding: 5px;
-}
-
-.data-line-items {
-    padding: 3px;
-}
-
-.data-line-items {
-    display: grid;
-    gap: 16px;
-    width: fit-content;
 }
 
 .img-row {
@@ -95,7 +89,7 @@ button {
 
 .graph-image {
     background-color: white;
-    padding: 25px;
+    padding: 5px;
 }
 
 
@@ -129,32 +123,42 @@ button {
 }
 
 .now-button {
+    &.past-view {
+	background-color: var(--tertiary-bg-color);
+    }
+
     width: 125px;
+}
+
+
+.data-line-items {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 32px;
+    margin: 5px;
+  
+    div {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+    }
+
+    .value, .unit {
+	font-weight: 700;
+    }
+
+    .unit {
+	margin-left: 3px;
+    }
 }
 
 @media (min-width: 1413px) {
     /* Big screen */
-    .data-line-items {
-	grid-template-columns: repeat(3, 1fr);
-	min-height: 60px;
-    }
-
-    .loader {
-	top: -32px;
-	left: 0;
-    }
 }
 
 @media (max-width: 1412px) {
     /* Medium screen */
-    .data-line-items {
-	grid-template-columns: repeat(2, 1fr);
-	min-height: 91px;
-    }
-
-    .loader {
-	top: -34px;
-    }
 }
 
 @media (max-width:  800px) {

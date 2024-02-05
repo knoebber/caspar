@@ -66,6 +66,7 @@ class HourlyDataItem {
       label: '24 hour rainfall',
       selector: '.js-daily-rainfall',
       value: parseFloat(this.dataItem.daily_rainfall) || 0,
+      unit: 'in',
     };
   }
 
@@ -74,6 +75,7 @@ class HourlyDataItem {
       label: 'Season rainfall',
       selector: '.js-season-rainfall',
       value: parseFloat(this.dataItem.annual_rainfall) || 0,
+      unit: 'in',
     };
   }
 
@@ -82,6 +84,7 @@ class HourlyDataItem {
       label: 'Stage',
       selector: '.js-stage',
       value: parseFloat(this.dataItem.stage) || 0,
+      unit: 'ft',
     };
   }
 
@@ -90,6 +93,7 @@ class HourlyDataItem {
       label: 'Temperature',
       selector: '.js-temperature',
       value: parseFloat(this.dataItem.temperature) || 0,
+      unit: '°F',
     };
   }
 
@@ -98,6 +102,7 @@ class HourlyDataItem {
       label: 'Turbidity',
       selector: '.js-turbidity',
       value: parseFloat(this.dataItem.turbidity) || 0,
+      unit: 'NTU',
     };
   }
 
@@ -123,18 +128,45 @@ class HourlyDataItem {
       this.stage,
       this.temperature,
       this.turbidity,
-    ].forEach(({ label, selector, value }) => {
-      selectFirst(selector).innerHTML = `${label}: ${value}`;
+    ].forEach(({ label, selector, value, unit }) => {
+      selectFirst(selector)
+	.innerHTML = `${label}: <span class="value">${value}</span><span class="unit">${unit ?? ''}</span>`;
     });
   }
 }
 
+const nowButton = selectFirst('.js-now');
+const nowStartText = nowButton.innerHTML;
+
 class Controller {
-  constructor(onFetch) {
+  constructor() {
     this.viewedDate = null;
     this.responseCache = {};
-    this.onFetch = onFetch;
+    this.mostRecentDateValueWithData = 0;
+    this.isFirstLoad = true;
+    this.isLoading = true;
   }
+
+
+  async onFetch(p) {
+    nowButton.innerHTML = nowStartText;
+    await p;
+
+    nowButton.innerHTML = 'Most Recent';
+    if (this.isFirstLoad) {
+      document.querySelectorAll('.js-show-after-load').forEach((el) => {
+	el.classList.remove('hidden');
+      });
+      this.isFirstLoad = false;
+    }
+
+    this.isLoading = false;
+
+    // const isPastView = await this.isPastView();
+    // console.log('is past view', isPastView);
+    // nowButton.classList.toggle('past-view', isPastView);
+  }
+
 
   get viewKey() {
     return makeHourKey(this.viewedDate);
@@ -144,6 +176,10 @@ class Controller {
     return this.responseCache[this.viewKey];
   }
 
+  async isPastView() {
+    const mostRecentData = await this.getHourlyDataItem(this.viewedDate);
+    return !mostRecentData.hasData || mostRecentData.date.valueOf() < this.mostRecentDateValueWithData;
+  }
 
   async initialize() {
     const urlValue = new URLSearchParams(window.location.search).get(urlKey);
@@ -153,7 +189,6 @@ class Controller {
     } else {
       this.syncLatest();
     }
-
   }
 
   async getHourlyDataItem(date) {
@@ -175,7 +210,6 @@ class Controller {
     (await this.getHourlyDataItem(this.viewedDate)).render();
     this.renderCalculatedRain();
   }
-
 
   async calcHourlyRain() {
     const currentData = await this.getHourlyDataItem(this.viewedDate);
@@ -210,8 +244,8 @@ class Controller {
   async renderCalculatedRain() {
     const threeDayRain = await this.calcThreeDayRain() ?? '?';
     const hourlyRain = await this.calcHourlyRain() ?? '?';
-    selectFirst('.js-72-hour-rainfall').innerHTML = `72 hour rain: ${threeDayRain}`;
-    selectFirst('.js-1-hour-rainfall').innerHTML = `1 hour rain: ${hourlyRain}`;
+    selectFirst('.js-72-hour-rainfall').innerHTML = `72 hour rain <span class="value">${threeDayRain}</span><span class="unit">in</span>`;
+    selectFirst('.js-1-hour-rainfall').innerHTML = `1 hour rain <span class="value">${hourlyRain}</span><span class="unit">in</span>`;
   }
 
   setViewedDay(day) {
@@ -254,30 +288,7 @@ class Controller {
   }
 }
 
-let isFirstLoad = true;
-let isLoading = true;
-
-const nowButton = selectFirst('.js-now');
-const nowStartText = nowButton.innerHTML;
-
-async function onFetch(p) {
-  console.log('start await for', p);
-  nowButton.innerHTML = nowStartText;
-  await p;
-
-
-  nowButton.innerHTML = 'Most Recent';
-  if (isFirstLoad) {
-    document.querySelectorAll('.js-show-after-load').forEach((el) => {
-      el.classList.remove('hidden');
-    });
-    isFirstLoad = false;
-  }
-
-  isLoading = false;
-}
-
-const controller = new Controller(onFetch);
+const controller = new Controller();
 
 async function main(controller) {
   controller.initialize();
