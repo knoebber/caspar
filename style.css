@@ -4,6 +4,7 @@
     --blue: #3f3fff;
     --red: #f53a36;
 
+    /* https://www.color-hex.com/color-palette/1040663 */
     --bg-color: #f4ede6;
     --secondary-bg-color: #abbaca;
     --tertiary-bg-color: #cf9475;
@@ -77,6 +78,10 @@ button {
 
 button:hover {
     background-color: var(--bg-color);
+}
+
+.chart-wrapper {
+    width: 807px; /* Same width as graph image */
 }
 
 .img-row {

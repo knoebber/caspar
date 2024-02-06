@@ -145,6 +145,8 @@ class Controller {
     this.mostRecentDateValueWithData = 0;
     this.isFirstLoad = true;
     this.isLoading = true;
+    this.chartEl = selectFirst('.js-data-item-chart');
+    this.dateFmt = new Intl.DateTimeFormat('en-US');
   }
 
 
@@ -209,10 +211,11 @@ class Controller {
     window.history.replaceState({urlKey: this.viewKey }, '', `?${urlKey}=${this.viewKey}`);
     (await this.getHourlyDataItem(this.viewedDate)).render();
     this.renderCalculatedRain();
+    this.renderRainChart();
   }
 
-  async calcHourlyRain() {
-    const currentData = await this.getHourlyDataItem(this.viewedDate);
+  async calcHourlyRain(date) {
+    const currentData = await this.getHourlyDataItem(date);
     let previousHourData = new HourlyDataItem(null);
     if (currentData.hasData) {
       const previousHour = new Date(currentData.date.valueOf() - msInHour);
@@ -243,7 +246,7 @@ class Controller {
 
   async renderCalculatedRain() {
     const threeDayRain = await this.calcThreeDayRain() ?? '?';
-    const hourlyRain = await this.calcHourlyRain() ?? '?';
+    const hourlyRain = await this.calcHourlyRain(this.viewedDate) ?? '?';
     selectFirst('.js-72-hour-rainfall').innerHTML = `72 hour rain <span class="value">${threeDayRain}</span><span class="unit">in</span>`;
     selectFirst('.js-1-hour-rainfall').innerHTML = `1 hour rain <span class="value">${hourlyRain}</span><span class="unit">in</span>`;
   }
@@ -286,13 +289,51 @@ class Controller {
   viewNextHour() {
     this.setViewedHour(this.viewedDate.getHours() + 1);
   }
+
+  async renderRainChart() {
+    const currentMs = this.viewedDate.valueOf();
+
+    const hoursInWeek = Array
+      .from({ length: 7 * 24 })
+      .map((_, i) => new Date(currentMs - (msInHour * i)));
+
+
+    if (!this.rainChart && window.Chart) {
+      this.rainChart = new window.Chart(this.chartEl, {
+	type: 'bar',
+	data: {
+	  labels: hoursInWeek.map((d) => d.toLocaleString()),
+	},
+	options: {
+	  scales: {
+	    x: {
+	      drawOnChartArea: false,
+	      display: false,
+	      drawTicks: false,
+	    },
+	    y: {
+	      beginAtZero: true,
+	    }
+	  },
+	},
+      });
+    }
+
+    if (this.rainChart) {
+      this.rainChart.data.datasets = [{
+	label: 'Hourly Rainfall',
+	data: await Promise.all(hoursInWeek.map((d) => this.calcHourlyRain(d))),
+      }];
+
+      this.rainChart.update();
+    }
+  }
 }
 
 const controller = new Controller();
 
 async function main(controller) {
   controller.initialize();
-  await controller.calcHourlyRain();
 
   document.onkeydown = async (e) => {
     let controllerMethod;
@@ -340,7 +381,6 @@ async function main(controller) {
     };
   });
 }
-
 
 main(controller);
 
